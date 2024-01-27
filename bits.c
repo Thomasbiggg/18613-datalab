@@ -123,9 +123,9 @@ extern int printf(const char *, ...);
  *   Rating: 1
  */
 long bitXor(long x, long y) {
-    // XOR meant to find the different bit between two variables, but we could only use &
-    // use & to get the same bits and then use ~ to convert them and then we will get the different bits
-    // At last use & to get the 
+    // XOR meant to find the different bit between two variables, but we could
+    // only use & use & to get the same bits and then use ~ to convert them and
+    // then we will get the different bits At last use & to get the
     long res = ~(x & y) & (~((~x) & (~y)));
     return res;
 }
@@ -136,8 +136,8 @@ long bitXor(long x, long y) {
  *   Rating: 1
  */
 long tmin(void) {
-    // smallest long in bits looks like 1 at the leftmost bit abd the rest are 0s
-    // Therefore left shift 1 by 63
+    // smallest long in bits looks like 1 at the leftmost bit abd the rest are
+    // 0s Therefore left shift 1 by 63
     long res = 1L << 63;
     return res;
 }
@@ -152,7 +152,7 @@ long isTmax(long x) {
     // transform every number to 0 or 1 -> use !
     // XOR checks for difference -> same will return 0
     // use !0 to output 1 and all else will output 0
-    long res = !(x ^ ( ~(1L << 63)));
+    long res = !(x ^ (~(1L << 63)));
     return res;
 }
 // 2
@@ -166,9 +166,13 @@ long isTmax(long x) {
  *   Rating: 2
  */
 long allOddBits(long x) {
-    // right shift x by one and XOR with x to create -1
-    // and then plus one to make -1 to 0
-    long res = !((x ^ ((x >> 1) ^ (1L << 63))) + 1L);
+    // mask of 0101 0101
+    // use and to get the odd bits, and use XOR to check for difference -> same returns 0
+    long mask = 170L;
+    mask |= mask << 8;
+    mask |= mask << 16;
+    mask |= mask << 32;
+    long res = !(mask ^ (x & mask));
     return res;
 }
 /*
@@ -190,7 +194,7 @@ long negate(long x) {
  *   Max ops: 16
  *   Rating: 3
  */
-// check if it is 0 
+// check if it is 0
 long conditional(long x, long y, long z) {
     // not 2 -> 0
     // use ((!x) + (~0L)) and (~(!x) + 1L) becomes 1 or 0 at anytime
@@ -210,8 +214,9 @@ long rotateLeft(long x, long n) {
     long mask = (1L << 63) >> n;
     long shift_bits = x & mask;
     // right shift by 63-n
-    // to check if the n is 0, if not create a mask for shift bits 
-    long shift_mask = (((1L << n) + (~0)) & ((!n) + (~0L))) | (0 & (~(!n) + 1L));
+    // to check if the n is 0, if not create a mask for shift bits
+    long shift_mask =
+        (((1L << n) + (~0)) & ((!n) + (~0L))) | (0 & (~(!n) + 1L));
 
     shift_bits = (shift_bits >> (64L + ((~n) + 1L))) & shift_mask;
     long res = (x << n) + shift_bits;
@@ -245,7 +250,7 @@ long isLessOrEqual(long x, long y) {
  */
 // two mask gen one from other
 long allAsciiDigits(long x) {
-    return 2; 
+    return 2;
 }
 /*
  * bitParity - returns 1 if x contains an odd number of 0's
@@ -253,11 +258,11 @@ long allAsciiDigits(long x) {
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 22
  *   Rating: 4
- */ 
+ */
 long bitParity(long x) {
-    // the least significant bit will be discarded because of XOR and right shift,
-    // at last the answer will be stored at the rightmost bit
-    // so we end up using &1 to get the rightmost bit
+    // the least significant bit will be discarded because of XOR and right
+    // shift, at last the answer will be stored at the rightmost bit so we end
+    // up using &1 to get the rightmost bit
     x ^= x >> 32;
     x ^= x >> 16;
     x ^= x >> 8;
@@ -276,9 +281,10 @@ long bitParity(long x) {
  */
 // two complemnet 0, ~0 all 0
 long logicalNeg(long x) {
-    // the OR will let the left most bit(most significant) turns to 1 all the time
-    // right shift the one to the least significant bit and the value will become -1 always
-    long res = ((x | (~x) + 1L) >> 63) + 1L;
+    // the OR will let the left most bit(most significant) turns to 1 all the
+    // time right shift the one to the least significant bit and the value will
+    // become -1 always
+    long res = ((x | ((~x) + 1L)) >> 63) + 1L;
     return res;
 }
 // float
@@ -296,7 +302,7 @@ long logicalNeg(long x) {
 int floatIsLess(unsigned uf, unsigned ug) {
     return 2;
     // compare sign
-    // 
+    //
 }
 /*
  * floatScale1d2 - Return bit-level equivalent of expression 0.5*f for
@@ -314,30 +320,27 @@ int floatIsLess(unsigned uf, unsigned ug) {
 // if exponent is all 1's => inf
 // if exponent is all 1's and frac not 0 => Nan
 unsigned floatScale1d2(unsigned uf) {
-    unsigned sign_mask = 1u<<31;
+    unsigned sign_mask = 1u << 31;
     unsigned sign = uf & sign_mask;
 
     unsigned exp_mask = 255u << 23;
-    unsigned exp = (uf & exp_mask)>>23;
+    unsigned exp = (uf & exp_mask) >> 23;
 
     unsigned frac_mask = (1u << 23) - 1u;
     unsigned frac = uf & frac_mask;
 
-    if (exp == 0u) { // denormal
+    if (exp == 0u) {      // denormal
         if (frac == 3u) { // round up for 011
             frac = 1u;
         } else {
             frac >>= 1;
         }
-    }
-    else if (exp == 1u) { // norm to denorm
+    } else if (exp == 1u) { // norm to denorm
         frac = (frac >> 1) | (1u << 22);
         exp = 0u;
-    } 
-    else if (exp == exp_mask) { // special 
+    } else if (exp == exp_mask) { // special
         return uf;
-    }
-    else { // norm
+    } else { // norm
         exp -= 1u;
     }
     return sign + (exp << 23) + frac;
