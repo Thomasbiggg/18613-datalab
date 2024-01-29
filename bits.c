@@ -167,7 +167,8 @@ long isTmax(long x) {
  */
 long allOddBits(long x) {
     // mask of 0101 0101
-    // use and to get the odd bits, and use XOR to check for difference -> same returns 0
+    // use and to get the odd bits, and use XOR to check for difference -> same
+    // returns 0
     long mask = 170L;
     mask |= mask << 8;
     mask |= mask << 16;
@@ -221,7 +222,6 @@ long rotateLeft(long x, long n) {
     shift_bits = (shift_bits >> (64L + ((~n) + 1L))) & shift_mask;
     long res = (x << n) + shift_bits;
     return res;
-    return 2;
 }
 /*
  * isLessOrEqual - if x <= y  then return 1, else return 0
@@ -232,9 +232,18 @@ long rotateLeft(long x, long n) {
  */
 long isLessOrEqual(long x, long y) {
     // check the leftmost bit to see if it is 1
-    long negative_check = 1L << 63;
+
+    long x_sign = (x >> 63) & 1L;
+    long y_sign = (y >> 63) & 1L;
+    long x_y = x_sign ^ y_sign;
+
     long diff = y + ((~x) + 1L);
-    long res = !((diff & negative_check) >> 63);
+    long diff_sign = (diff >> 63) & 1L;
+
+    // if y-(-x) -> it returns a overflows and returns (e.g. -1)
+    // if x and y is same sign -> diff >0 returns 1 else return 0
+    // if different sign diff, output 0 if y is neg
+    long res = (x_sign & ((!x_y) + (~0L))) | ((!diff_sign) & ((~(!x_y)) + 1L));
     return res;
 }
 // 4
@@ -300,9 +309,46 @@ long logicalNeg(long x) {
  *   Rating: 3
  */
 int floatIsLess(unsigned uf, unsigned ug) {
-    return 2;
-    // compare sign
-    //
+    unsigned sign_mask = 1u << 31;
+    unsigned sign_f = uf & sign_mask;
+    unsigned sign_g = ug & sign_mask;
+
+    unsigned exp_mask = 255u << 23;
+    unsigned exp_f = (uf & exp_mask);
+    unsigned exp_g = (ug & exp_mask);
+
+    unsigned frac_mask = (1u << 23) - 1u;
+    unsigned frac_f = uf & frac_mask;
+    unsigned frac_g = ug & frac_mask;
+
+    // check 0
+    if ((((uf << 1) & (sign_mask - 1u)) == 0u) &&
+        (((ug << 1) & (sign_mask - 1u)) == 0u)) {
+        return 0;
+    }
+    // check NaN
+    if (((exp_f == exp_mask) && (frac_f != 0)) ||
+        ((exp_g == exp_mask) && (frac_g != 0))) {
+        return 0;
+    }
+    // check sign
+    if (sign_f != sign_g) {
+        return sign_f > sign_g;
+    }
+
+    if (exp_f == exp_g) {
+        // if both are negative, the smaller the greater
+        if (sign_f == sign_mask) {
+            return frac_f > frac_g;
+        }
+        return frac_g > frac_f;
+    } else {
+        // if both are negative, the smaller the greater
+        if (sign_f == sign_mask) {
+            return exp_f > exp_g;
+        }
+        return exp_g > exp_f;
+    }
 }
 /*
  * floatScale1d2 - Return bit-level equivalent of expression 0.5*f for
@@ -329,16 +375,24 @@ unsigned floatScale1d2(unsigned uf) {
     unsigned frac_mask = (1u << 23) - 1u;
     unsigned frac = uf & frac_mask;
 
-    if (exp == 0u) {      // denormal
-        if (frac == 3u) { // round up for 011
-            frac = 1u;
-        } else {
-            frac >>= 1;
+    // flag for rounding up
+    unsigned check = 0u;
+    if ((frac & 3u) == 3u) {
+        check = 1u;
+    }
+
+    if (exp == 0u) { // denormal
+        frac >>= 1;
+        if (check) { // round up for 011
+            frac += 1u;
         }
     } else if (exp == 1u) { // norm to denorm
         frac = (frac >> 1) | (1u << 22);
+        if (check) { // round up for 011
+            frac += 1u;
+        }
         exp = 0u;
-    } else if (exp == exp_mask) { // special
+    } else if (exp == 255u) { // special
         return uf;
     } else { // norm
         exp -= 1u;
@@ -355,14 +409,42 @@ unsigned floatScale1d2(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatUnsigned2Float(unsigned u) {
-    unsigned sign_mask = 1u << 31;
-    unsigned sign = u & sign_mask;
+    if (u == 0u) {
+        return 0u;
+    }
 
-    unsigned exp_mask = 255u << 23;
-    unsigned exp = (u & exp_mask) >> 23;
+    long exp = 31u;
 
-    unsigned frac_mask = (1u << 23) - 1u;
-    unsigned frac = u & frac_mask;
+    while ((u & (1u << exp)) >> exp != 1u) {
+        exp--;
+    }
+    unsigned frac;
+    if (exp < 23) {
+        frac = (u & ((1u << exp) - 1)) << (23u - exp);
+    } else {
+        // use Xor to check != 0
+        // round up
+        // if being >> 8,
+        unsigned shift = exp - 23u;
 
-    return sign + (exp << 23) + frac;
+        unsigned sticky_mask = ((1u << (shift - 1u)) - 1u);
+        unsigned sticky_b = 0;
+        if ((sticky_mask & u) != 0u) {
+            sticky_b += 1;
+        }
+        unsigned round_mask = (1u << (shift - 1u));
+        unsigned round_b = (round_mask & u) >> (shift - 1u);
+
+        frac = (u & ((1u << exp) - 1)) >> (exp - 23u);
+
+        unsigned guard_b = frac & 1u;
+
+        if (round_b && (guard_b + sticky_b)) {
+            frac += 1u;
+        }
+    }
+
+    exp += 127u;
+
+    return (exp << 23) + frac;
 }
